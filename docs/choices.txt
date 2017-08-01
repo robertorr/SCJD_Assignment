@@ -1,0 +1,70 @@
+---------------------------------------------------------
+| Sun Certified Java 2 Developer (SCJD) Exam Assignment |
+| Exam #: CX-310-252A                                   |
+| Contract #: 1099225                                   |
+| Candidate name: Robert J. Orr                         |
+|                                                       |
+| $Id: choices.txt 8 2010-09-22 02:16:16Z robertorr $   |
+---------------------------------------------------------
+
+
+Design Choices for SCJD Assignment
+===================================
+
+Database Module
+----------------
+- In the specification where it says, the user interface "must allow the user to search the data for all records,
+  or for records where the name and/or location fields exactly match values specified by the user", it is unclear
+  to me what this means exactly.  Does this mean that we can choose one of these search capabilities to implement?
+  Or does it mean that both must be implemented? If we implement the first capability, what kind of search is this
+  (a single keyword search across all fields, a boolean keyword search, etc.)?  Because this requirement seems
+  underspecified, I will implement a search capability that will allow a single criterion per field and will be a
+  boolean AND across all criteria (i.e., a record's fields must match all non-null search criteria).  I will
+  implement a "starts-with" match for each criterion so that I can use the find() method defined in the DBMain
+  interface.  Also, blank criteria will match all records.  (The SPECIALTIES field will have to be handled specially
+  so that the search criterion will be able to match any of the values in the comma-separated values list.)
+
+- We need to lock records during creation, updating, deletion, and booking (all actions that modify a record).
+  However, we also need to lock a record during reading so that another thread will not come along and modify or
+  delete the record while it is being read.  This will allow only a single thread at a time to perform any of these
+  functions.  Another solution is to allow multiple readers per record at a time, but only a single thread to modify
+  or delete.  This second solution requires a more complex implementation, and because it is not required by the
+  specification I will only allow a single thread to have any kind of access to a specific record at a time.
+
+- The DBMain interface does not specify whether record indices are zero-based or one-based.  I will therefore choose
+  to make them zero-based because this is consistent with array and collection indexing in Java.
+
+- The DBMain.create() description does not specify when a DuplicateKeyException should be thrown, so I will assume
+  that it will be thrown when the NAME and LOCATION fields of the given data array match an already existing record
+  in the database.  (I have chosen NAME and LOCATION because in the supplied database sample, there are multiple
+  records with the same NAME but different LOCATIONs.)  Thus, the combined NAME and LOCATION fields serve as the
+  unique key for the record.
+
+- While the database file spec does not state this specifically, it implies that the records are indexed by position
+  in the file (whether they are valid, i.e. not marked for deletion, or not).  That is, to navigate to a particular
+  record number, the positional offset from the start of record zero can be easily calculated by multiplying the
+  record number by the record length.  I will assume this to be true.
+
+- In the suncertify.db.Data class, each function needs to open and close the database file independently so that
+  different threads can run inside the same Data object at the same time.  If I kept a reference to the open database
+  file as a member variable and more than one thread was executing at a time, the file pointer would not be
+  maintained in a consistent state and I/O operations would not execute as expected.  A possible workaround to this
+  problem is to make sure that different threads instantiate and use different Data objects, but this is potentially
+  cumbersome and lower-performing.
+
+
+Server
+-------
+- In order to uniquely and globally identify which client has locked a record, we need to have a globally unique
+  identifier.  The java.rmi.server.UID class gets us most of the way there, but it isn't guaranteed to be unique
+  across different physical machines.  To solve this, I will prepend the machine's IP address to the UID to give
+  a globally unique ID.  I will have to pass this ID along from the requesting client all the way to the locking
+  mechanism.
+
+
+User Interface
+---------------
+- Even though the GUI specification does not require the ability to create, update, or delete records, I will
+  include this functionality in the GUI in order to test the database access module (as specified in DBMain.java).
+
+- 
